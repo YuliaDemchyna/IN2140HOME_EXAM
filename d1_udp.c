@@ -92,8 +92,7 @@ int d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz )
         printf("exit -1 ");
         return -1;
     }
-    // printf("Header size: %zu, Received size: %zd\n", sizeof(D1Header), received_len);
-    // printf("Packet reported size: %u, received_len: %zd\n", ntohl(header->size), received_len);
+
 
 
     // Validate received length against minimum header size
@@ -134,25 +133,65 @@ int d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz )
     // Copy payload to buffer
     memcpy(buffer, packet_buffer + sizeof(D1Header), payload_size);
 
-    // Send appropriate ACK
-    d1_send_ack(peer, header->flags & SEQNO);
-    peer->next_seqno = 1; // make sure it works for all cases
+    d1_send_ack(peer, peer->next_seqno);
+    peer->next_seqno = peer->next_seqno ? 0 : 1;
 
+    printf("Payload size: %zu, Returning normally\n", payload_size);
+    printf("size: %zu \n", sz);
 
-    printf("returing as normall\n");
-    return 0;
+    return payload_size;
 }
 
-int d1_wait_ack( D1Peer* peer, char* buffer, size_t sz )
-{
-    /* This is meant as a helper function for d1_send_data.
-     * When D1 data has send a packet, this one should wait for the suitable ACK.
-     * If the arriving ACK is wrong, it resends the packet and waits again.
-     *
-     * Implementation is optional.
-     */
-    return 0;
+int d1_wait_ack(D1Peer* peer, char* buffer, size_t sz) {
+    char packet_buffer[1024];
+    ssize_t received_len;
+    struct sockaddr_in from;
+    socklen_t from_len = sizeof(from);
+
+    printf("Waiting for ACK...\n");
+
+    while (1) {
+        received_len = recvfrom(peer->socket, packet_buffer, sizeof(packet_buffer), 0,
+                                (struct sockaddr *)&from, &from_len);
+
+        if (received_len < 0) {
+            perror("recvfrom failed");
+            return -1;  // Error in receiving data
+        }
+
+        if (received_len < sizeof(D1Header)) {
+            fprintf(stderr, "Received packet too short to contain header\n");
+            continue;  // Wait for next packet
+        }
+
+        D1Header *header = (D1Header *)packet_buffer;
+
+        // Check if the packet is an ACK
+        if ((ntohs(header->flags) & FLAG_ACK) == FLAG_ACK) {
+            uint16_t seqno = ntohs(header->flags) & ACKNO;
+
+
+            // Check if the sequence number matches
+            if (seqno == peer->next_seqno) {
+                printf("Received correct ACK with seqno %d\n", peer->next_seqno);
+                // peer->next_seqno = peer->next_seqno ? 0 : 1;  // Toggle the sequence number
+                return 1;  // Success
+            } else {
+                fprintf(stderr, "Received incorrect ACK seqno %d, expected %d. Resending data.\n", seqno, peer->next_seqno);
+                // Resend the data
+                if (d1_send_data(peer, buffer, sz) < 0) {
+                    fprintf(stderr, "Failed to resend data\n");
+                    return -2;  // Error in resending data
+                }
+                // Continue to wait for the correct ACK
+            }
+        } else {
+            fprintf(stderr, "Received non-ACK packet during ACK wait\n");
+            return -3 ;// Continue waiting, ignore non-ACK packets
+        }
+    }
 }
+
 
 //HELPER FUNCTION TO CALCULATE CHECKSUM
 uint16_t calculate_checksum(const D1Header* header, const char* data, size_t data_size) {
@@ -231,10 +270,11 @@ int d1_send_data(D1Peer* peer, char* buffer, size_t sz) {
     }
 
     // Wait for acknowledgement
-    // int ack_result = d1_wait_ack(peer, packet_buffer, total_packet_size);
-    // if (ack_result != 1) {
-    //     return -3; // Acknowledgment error
-    // }
+    int ack_result = d1_wait_ack(peer, packet_buffer, total_packet_size);
+
+    if (ack_result != 1) {
+        return -3; // Acknowledgment error
+    }
 
     return 0;
 }
@@ -243,15 +283,19 @@ int d1_send_data(D1Peer* peer, char* buffer, size_t sz) {
 void d1_send_ack(struct D1Peer* peer, int seqno) {
     D1Header ackHeader;
     char ackPacket[sizeof(D1Header)];  // Assuming no additional data is sent with ACKs.
-    printf("seqno %u\n", seqno);
+
+    printf("Sending ACK for seqno %d\n", seqno);
 
     memset(&ackHeader, 0, sizeof(ackHeader));
     ackHeader.flags = htons(FLAG_ACK);
-    if (peer->next_seqno == 1) {
-        ackHeader.flags |= htons(ACKNO);
 
+    // Directly use the `seqno` argument to set the sequence number in the ACK
+    if (seqno == 1) {
+        ackHeader.flags |= htons(ACKNO);
     }
-    printf("ackHeader.flags: %u\n", ackHeader.flags);
+
+    // Log what flags are set for debugging
+    printf("ackHeader.flags: %hu\n", ntohs(ackHeader.flags));
 
     ackHeader.size = htonl(sizeof(D1Header));
     ackHeader.checksum = htons(calculate_checksum(&ackHeader, NULL, 0));
@@ -265,3 +309,6 @@ void d1_send_ack(struct D1Peer* peer, int seqno) {
     }
 }
 
+
+//TODO wake sure that  if wait ack gets wrong suqince number the data will must be sent again. ITS ONLY ABOUT SEQUENCES NUMBER
+// so look for that error code and make a loop until  sequence nuber is resolved
