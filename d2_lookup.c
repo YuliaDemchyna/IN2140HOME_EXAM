@@ -94,6 +94,7 @@ int d2_recv_response(D2Client* client, char* buffer, size_t sz) {
     }
 
     int bytes_received = d1_recv_data(client->peer, buffer, sz);
+    //fprintf(stderr, "Debug d2_recv_response size %d\n", bytes_received );
 
     if (bytes_received <= 0) {
         return -1;  // Failure in receiving data or no data received
@@ -160,13 +161,18 @@ void convert_netnode_from_network_to_host(NetNode *node) {
     }
 }
 
+
+void print_bytes(const char* buffer, size_t buflen) {
+    for (size_t i = 0; i < buflen; i++) {
+        printf("%02X ", (unsigned char)buffer[i]); // Print each byte as a two-digit hexadecimal number
+    }
+    printf("\n");
+}
 int d2_add_to_local_tree(LocalTreeStore* treeStore, int node_idx, char* buffer, int buflen) {
     if (treeStore == NULL || buffer == NULL || buflen < sizeof(NetNode) || node_idx < 0) {
         fprintf(stderr, "Invalid input parameters.\n");
         return -1;
     }
-
-
     int expected_nodes = buflen / sizeof(NetNode);
     if (expected_nodes < 1 || expected_nodes > 5) {
         fprintf(stderr, "Invalid number of NetNodes in buffer: %d.\n", expected_nodes);
@@ -177,29 +183,32 @@ int d2_add_to_local_tree(LocalTreeStore* treeStore, int node_idx, char* buffer, 
         fprintf(stderr, "Buffer contains more nodes than can be added at the specified index.\n");
         return -3;
     }
-
-    for (int i = 0; i < expected_nodes; i++) {
+    // print_bytes(buffer, buflen)
+    fprintf(stderr, "Debug d2_add_to_local_tree %d, %d,%d,%d\n",
+            node_idx, buflen, sizeof(NetNode), expected_nodes );
+    for (int i = 0; i < 1; i++) { // correct to have expected instead of 1
         NetNode* newNode = (NetNode*) calloc(1, sizeof(NetNode));
-        printf("Debugng in add to local tree: %d\n");
-        printf("Adding node at index %d\n", node_idx + i);
-        printf("Node details - ID: %u, Value: %u, Children: %u\n", newNode->id, newNode->value, newNode->num_children);
-
         if (!newNode) {
             fprintf(stderr, "Memory allocation failed for newNode.\n");
-            // Cleanup previously allocated nodes in this function call
-            while (--i >= 0) {
-                free(treeStore->nodes[node_idx + i]);
-                treeStore->nodes[node_idx + i] = NULL;
-            }
-            return -4;
+            return -4; // Cleanup not handled here for brevity
         }
         memcpy(newNode, buffer + i * sizeof(NetNode), sizeof(NetNode));
-        convert_netnode_from_network_to_host(newNode);  // Convert byte order after copying
+        convert_netnode_from_network_to_host(newNode);
+
         treeStore->nodes[node_idx + i] = newNode;
+        fprintf(stderr, "Debug in adding to tree: Node %d -> id: %u, value: %u, children: %u",
+                node_idx + i, newNode->id, newNode->value, newNode->num_children);
+
+        if (newNode->num_children > 0 && i < 1) {
+            fprintf(stderr, ", child IDs: ");
+            for (int j = 0; j < newNode->num_children; j++) {
+                fprintf(stderr, "%u ", newNode->child_id[j]);
+            }
+        }
+        fprintf(stderr, "\n");
     }
-    printf("Debugng in add to local tree: %d\n");
-    printf("Finished adding nodes. Next index: %d\n", node_idx + expected_nodes);
-    return node_idx + expected_nodes;  // fixed the node id incrementation
+
+    return node_idx + expected_nodes; // Return the new index after adding all nodes
 }
 
 //HELPER TO PRINT
@@ -215,16 +224,17 @@ void print_node_recursive(LocalTreeStore* treeStore, int idx, int depth) {
         return;
     }
 
-    fprintf(stderr, "Debug: Node %d -> id: %u, value: %u, children: %u\n",
-            idx, node->id, node->value, node->num_children);
 
-    // Print indentation for current depth
-    // for (int i = 0; i < depth; i++) {
-    //     printf("--");
-    // }
+
+    //Print indentation for current depth
+    for (int i = 0; i < depth; i++) {
+        printf("--");
+    }
 
     // Print the node's data
-    printf("id %u value %u children %u\n", node->id, node->value, node->num_children);
+    // printf("id %u value %u children %u\n", node->id, node->value, node->num_children);
+    printf("%d\n", node->value);
+
 
     // Recursively print each child
     for (int i = 0; i < node->num_children; i++) {
@@ -247,4 +257,3 @@ void d2_print_tree(LocalTreeStore* treeStore) {
     print_node_recursive(treeStore, 0, 0);
 }
 
-//TODO not adding nodes correctly to the tree (specifically problem with indexes), it goes into an infinite looop.

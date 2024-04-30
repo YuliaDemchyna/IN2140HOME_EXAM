@@ -24,8 +24,16 @@ struct D1Peer
 
 typedef struct D1Peer D1Peer;
 
+struct D1HeaderLocal
+{
+    uint16_t flags;
+    uint16_t checksum;
+    uint32_t size;
+};
 
-//helper function to calculate checksum
-uint16_t calculate_checksum(const D1Header* header, const char* data, size_t dataSize)
+typedef struct D1HeaderLocal D1HeaderLocal;
+
+uint16_t calculate_checksum(const D1HeaderLocal* header, const char* data, size_t dataSize);
 
 #endif /* D1_UDP_MOD_H */
+

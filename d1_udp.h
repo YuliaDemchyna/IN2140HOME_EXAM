@@ -22,15 +22,15 @@
  * - flags comprises 16 bits with the following meaning:
  *   bit 15: if true (1), this is a data packet. If it is false (0), this is not a
  *           data packet.
- *   bit 14: if true, this is an ACK packet.
- *   bit 13: if this is a data packet of connect packet, this contains the sequence
+ *   bit  8: if true, this is an ACK packet.
+ *   bit  7: if this is a data packet of connect packet, this contains the sequence
  *           number, which is either 0 or 1. If this is a disconnect or ACK packet,
  *           this is 0.
- *   bit 12: if this is an ACK packet, this bit contains the sequence number that is
+ *   bit  0: if this is an ACK packet, this bit contains the sequence number that is
  *           acknowledged (ie. it is a response to a data or connect packet).
- *   bits 11-0: always 0
+ *   bits 14-9 og 6-1: always 0
  *
- *   Only one of 14 or 15 can be 1.
+ *   Only one of 8 or 15 can be 1.
  *   Only data packets can contain data.
  * - checksum is computed by computing bit-wise XOR for all the fields flags, the upper
  *   and lower half of the size field, and (in case of a data packet), the entire data
@@ -67,15 +67,13 @@ struct D1Header
 typedef struct D1Header D1Header;
 
 /* These are the possible values of D1Header.flags in host byte order.
- * When you send D1Headers over the network, they must be send in network
+ * When you send D1Headers over the network, they must be sent in network
  * byte order.
  */
 #define FLAG_DATA       (1 << 15)
 #define FLAG_ACK        (1 << 8)
 #define SEQNO           (1 << 7)
 #define ACKNO           (1 << 0)
-
-uint16_t calculate_checksum(const D1Header* header, const char* data, size_t dataSize);
 
 
 /** Create a UDP socket that is not bound to any port yet. This is used as a
@@ -100,18 +98,21 @@ D1Peer* d1_delete( D1Peer* peer );
  */
 int d1_get_peer_info( struct D1Peer* client, const char* servername, uint16_t server_port );
 
-/** If the buffer does not exceed the packet size, send add the D1 header and send
+/** If the buffer does not exceed the packet size, the function adds the D1 header and sends
  *  it to the peer.
+ *  Returns the number of bytes sent in case of success, and a negative value in case
+ *  of error.
  */
 int  d1_send_data( struct D1Peer* peer, char* buffer, size_t sz );
 
 /** Called by d1_send_data when it has successfully sent its packet. This functions waits for
  *  an ACK from the peer.
  *  If the sequence number of the ACK matches the next_seqno value in the D1Peer stucture,
- *  this function changes the next_seqno in the D1Peer data structure
- *  (0->1 or 1->0) and returns to the caller.
- *  If the sequence number does not match, d1_send_data followed by d1_wait_ack is called
+ *  this function changes the next_seqno in the D1Peer data structure                           // doesnt work like this, first two packets recieve ack 0.
+ *  (0->1 or 1->0) and returns to the caller.                                                   // it should be toggled in recieving of the packet on my client side.
+ *  If the sequence number does not match, d1_send_data followed by d1_wait_ack is called       //
  *  again.
+ *  Returns a positive value in case of success, and a negative value in case of error.
  *
  *  This function is only meant to be called by d1_send_data. You don't have to implement it.
  */
@@ -121,14 +122,16 @@ int  d1_wait_ack( D1Peer* peer, char* buffer, size_t sz );
  *  size indicated in the header is correct and if the checksum is correct.
  *  If size or checksum are incorrect, an ACK with the opposite value is sent (this should
  *  trigger the sender to retransmit).
- *  In other cases, an error message is printed and a negative number if returned to the
+ *  In other cases, an error message is printed and a negative number is returned to the
  *  calling function.
+ *  Returns the number of bytes received in case of success, and a negative value in case
+ *  of error.
  */
 int  d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz );
 
 /** Send an ACK for the given sequence number.
  */
-void d1_send_ack   ( struct D1Peer* peer, int seqno );
+void d1_send_ack( struct D1Peer* peer, int seqno );
 
 #endif /* D1_UDP_H */
 

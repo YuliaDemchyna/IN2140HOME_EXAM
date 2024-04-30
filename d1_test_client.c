@@ -26,8 +26,6 @@
 
 int main( int argc, char* argv[] )
 {
-    printf( "Main function for test entered !!! \n" );
-
     if( argc < 3 )
     {
         fprintf( stderr, "Usage %s <host> <port>\n"
@@ -37,15 +35,13 @@ int main( int argc, char* argv[] )
         return -1;
     }
 
-    char*    server_name = argv[2];
+    char*    server_name = argv[1];
     uint16_t server_port = atoi(argv[2] );
 
     /* Create a suitable data structure to manage the assocation of this client
      * with a server.
      */
     D1Peer*  client = d1_create_client( );
-    printf( "Succsessfully created d1 client !!! \n" );
-
     if( ! client )
     {
         printf( "Failed to create D1 client.\n" );
@@ -132,4 +128,3 @@ int main( int argc, char* argv[] )
 
     return 0;
 }
-
