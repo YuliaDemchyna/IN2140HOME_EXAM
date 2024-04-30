@@ -55,6 +55,7 @@ int d2_send_request(D2Client* client, uint32_t id) {
     }
 
     PacketRequest request;
+    memset(&request, 0, sizeof(request));
     request.type = htons(TYPE_REQUEST);  // Convert TYPE_REQUEST to network byte order
     request.id = htonl(id);              // Convert id to network byte order
 
