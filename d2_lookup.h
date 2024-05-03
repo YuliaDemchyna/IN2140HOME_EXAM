@@ -133,6 +133,7 @@ D2Client* d2_client_delete( D2Client* client );
 int d2_send_request( D2Client* client, uint32_t id );
 
 /* Wait for a PacketResponseSize packet from the server.
+ *
  * Returns the number of NetNodes that will follow in several PacketReponse
  * packet in case of success. Note that this is _not_ the number of
  * PacketResponse packets that will follow because of PacketReponse can

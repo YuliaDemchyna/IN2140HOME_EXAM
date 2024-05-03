@@ -31,11 +31,3 @@ clean:
 	rm -f *.o
 	rm -f libhe.a
 	rm -rf *.gch
-
-run_d1: d1_test_client
-	./d1_test_client localhost 5000
-
-run_d1_valgrind: d1_test_client
-	valgrind --leak-check=full ./d1_test_client localhost 5000
-
-

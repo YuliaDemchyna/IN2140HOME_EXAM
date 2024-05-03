@@ -12,7 +12,6 @@
 D2Client* d2_client_create( const char* server_name, uint16_t server_port )
 {
 
-    // Create the D1Peer instance
     D1Peer* peer = d1_create_client();
     if (!peer) {
         fprintf(stderr, "Failed to create D1 peer\n");
@@ -47,7 +46,6 @@ D2Client* d2_client_delete(D2Client* client) {
     return NULL;
 }
 
-// not sure if it is succsessful
 int d2_send_request(D2Client* client, uint32_t id) {
     if (id <= 1000) {
         fprintf(stderr, "ID must be greater than 1000\n");
@@ -56,65 +54,62 @@ int d2_send_request(D2Client* client, uint32_t id) {
 
     PacketRequest request;
     memset(&request, 0, sizeof(request));
-    request.type = htons(TYPE_REQUEST);  // Convert TYPE_REQUEST to network byte order
-    request.id = htonl(id);              // Convert id to network byte order
+    request.type = htons(TYPE_REQUEST);
+    request.id = htonl(id);
 
-    // Use D1 function to send the data
     int result = d1_send_data(client->peer, (char*)&request, sizeof(request));
     if (result <= 0) {
         fprintf(stderr, "Failed to send PacketRequest using D1 function\n");
         return -1;
     }
 
-    return result;  // Return the result from the D1 layer function
+    return result;
 }
 
 int d2_recv_response_size(D2Client* client) {
-    char buffer[sizeof(PacketResponseSize)];
+    char buffer[1024];
     int bytes_received = d1_recv_data(client->peer, buffer, sizeof(buffer));
 
     if (bytes_received <= 0) {
-        return -1;  // Failure in receiving data or no data received
+        return -1;
     }
 
     PacketResponseSize* responseSize = (PacketResponseSize*) buffer;
 
     if (ntohs(responseSize->type) != TYPE_RESPONSE_SIZE) {
         fprintf(stderr, "Received packet is not a PacketResponseSize\n");
-        return -1;  // Incorrect packet type
+        return -1;
     }
 
-    // Convert the size from network to host byte order and return it
     return ntohs(responseSize->size);
 }
 
 int d2_recv_response(D2Client* client, char* buffer, size_t sz) {
     if (sz < sizeof(PacketResponse)) {
         fprintf(stderr, "Buffer too small for PacketResponse\n");
-        return -1;  // Buffer provided is too small to hold the smallest PacketResponse
+        return -1;
     }
 
     int bytes_received = d1_recv_data(client->peer, buffer, sz);
     //fprintf(stderr, "Debug d2_recv_response size %d\n", bytes_received );
 
     if (bytes_received <= 0) {
-        return -1;  // Failure in receiving data or no data received
+        return -1;
     }
 
     PacketResponse* response = (PacketResponse*) buffer;
 
     if (ntohs(response->type) != TYPE_RESPONSE && ntohs(response->type) != TYPE_LAST_RESPONSE) {
         fprintf(stderr, "Received packet is not a PacketResponse or LastResponse\n");
-        return -1;  // Incorrect packet type
+        return -1;
     }
 
-    // Verify that the received data length matches the payload_size declared in the header
     if (bytes_received != ntohs(response->payload_size)) {
         fprintf(stderr, "Mismatch between declared payload size and received size\n");
-        return -1;  // Data integrity issue
+        return -1;
     }
 
-    return bytes_received;  // Return the number of bytes stored in the buffer
+    return bytes_received;
 }
 
 LocalTreeStore* d2_alloc_local_tree(int num_nodes) {
@@ -127,8 +122,7 @@ LocalTreeStore* d2_alloc_local_tree(int num_nodes) {
         return NULL;
     }
 
-    // Allocate memory for the node pointers within the LocalTreeStore
-    treeStore->nodes = (NetNode**)calloc(num_nodes, sizeof(NetNode*));  // array of pointers
+    treeStore->nodes = (NetNode**)calloc(num_nodes, sizeof(NetNode*));
     if (treeStore->nodes == NULL) {
         free(treeStore);
         return NULL;
@@ -143,7 +137,7 @@ void d2_free_local_tree(LocalTreeStore* treeStore) {
         if (treeStore->nodes != NULL) {
             for (int i = 0; i < treeStore->number_of_nodes; i++) {
                 if (treeStore->nodes[i] != NULL) {
-                    free(treeStore->nodes[i]);  // looping and freeing all NetNode
+                    free(treeStore->nodes[i]);
                 }
             }
             free(treeStore->nodes);
@@ -152,7 +146,6 @@ void d2_free_local_tree(LocalTreeStore* treeStore) {
     }
 }
 
-// HELPER FUNCTION Ensure proper conversion from network to host byte order
 void convert_netnode_from_network_to_host(NetNode *node) {
     node->id = ntohl(node->id);
     node->value = ntohl(node->value);
@@ -165,7 +158,7 @@ void convert_netnode_from_network_to_host(NetNode *node) {
 
 void print_bytes(const char* buffer, size_t buflen) {
     for (size_t i = 0; i < buflen; i++) {
-        printf("%02X ", (unsigned char)buffer[i]); // Print each byte as a two-digit hexadecimal number
+        printf("%02X ", (unsigned char)buffer[i]);
     }
     printf("\n");
 }
@@ -187,11 +180,11 @@ int d2_add_to_local_tree(LocalTreeStore* treeStore, int node_idx, char* buffer, 
     // print_bytes(buffer, buflen)
     fprintf(stderr, "Debug d2_add_to_local_tree %d, %d,%d,%d\n",
             node_idx, buflen, sizeof(NetNode), expected_nodes );
-    for (int i = 0; i < 1; i++) { // correct to have expected instead of 1
+    for (int i = 0; i < 1; i++) { // correct to have expected instead of 1 but only have the first two nodes correct
         NetNode* newNode = (NetNode*) calloc(1, sizeof(NetNode));
         if (!newNode) {
             fprintf(stderr, "Memory allocation failed for newNode.\n");
-            return -4; // Cleanup not handled here for brevity
+            return -4;
         }
         memcpy(newNode, buffer + i * sizeof(NetNode), sizeof(NetNode));
         convert_netnode_from_network_to_host(newNode);
@@ -209,7 +202,7 @@ int d2_add_to_local_tree(LocalTreeStore* treeStore, int node_idx, char* buffer, 
         fprintf(stderr, "\n");
     }
 
-    return node_idx + expected_nodes; // Return the new index after adding all nodes
+    return node_idx + expected_nodes;
 }
 
 //HELPER TO PRINT
@@ -225,19 +218,13 @@ void print_node_recursive(LocalTreeStore* treeStore, int idx, int depth) {
         return;
     }
 
-
-
-    //Print indentation for current depth
     for (int i = 0; i < depth; i++) {
         printf("--");
     }
 
-    // Print the node's data
     // printf("id %u value %u children %u\n", node->id, node->value, node->num_children);
     printf("%d\n", node->value);
 
-
-    // Recursively print each child
     for (int i = 0; i < node->num_children; i++) {
         uint32_t childIdx = node->child_id[i];
         if (childIdx < 0 || childIdx >= treeStore->number_of_nodes) {
@@ -254,7 +241,6 @@ void d2_print_tree(LocalTreeStore* treeStore) {
         return;
     }
 
-    // Assume that the root node is at index 0, adjust if your structure varies
     print_node_recursive(treeStore, 0, 0);
 }
 

@@ -75,7 +75,6 @@ typedef struct D1Header D1Header;
 #define SEQNO           (1 << 7)
 #define ACKNO           (1 << 0)
 
-
 /** Create a UDP socket that is not bound to any port yet. This is used as a
  *  client port.
  *  Returns the pointer to a structure on the heap in case of success or NULL
@@ -108,9 +107,9 @@ int  d1_send_data( struct D1Peer* peer, char* buffer, size_t sz );
 /** Called by d1_send_data when it has successfully sent its packet. This functions waits for
  *  an ACK from the peer.
  *  If the sequence number of the ACK matches the next_seqno value in the D1Peer stucture,
- *  this function changes the next_seqno in the D1Peer data structure                           // doesnt work like this, first two packets recieve ack 0.
- *  (0->1 or 1->0) and returns to the caller.                                                   // it should be toggled in recieving of the packet on my client side.
- *  If the sequence number does not match, d1_send_data followed by d1_wait_ack is called       //
+ *  this function changes the next_seqno in the D1Peer data structure
+ *  (0->1 or 1->0) and returns to the caller.
+ *  If the sequence number does not match, d1_send_data followed by d1_wait_ack is called
  *  again.
  *  Returns a positive value in case of success, and a negative value in case of error.
  *
@@ -120,12 +119,16 @@ int  d1_wait_ack( D1Peer* peer, char* buffer, size_t sz );
 
 /** Call this to wait for a single packet from the peer. The function checks if the
  *  size indicated in the header is correct and if the checksum is correct.
+ *  In case of success, remove the D1 header and store only the payload in the buffer
+ *  that is passed a parameter. The size sz is the size of the buffer provided by the
+ *  caller.
  *  If size or checksum are incorrect, an ACK with the opposite value is sent (this should
  *  trigger the sender to retransmit).
  *  In other cases, an error message is printed and a negative number is returned to the
  *  calling function.
- *  Returns the number of bytes received in case of success, and a negative value in case
- *  of error.
+ *  Returns the number of bytes received as payload in case of success, and a negative value
+ *  in case of error. Empty data packets are allowed, and a return value of 0 is therefore
+ *  valid.
  */
 int  d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz );
 
@@ -134,4 +137,3 @@ int  d1_recv_data( struct D1Peer* peer, char* buffer, size_t sz );
 void d1_send_ack( struct D1Peer* peer, int seqno );
 
 #endif /* D1_UDP_H */
-
